@@ -31,7 +31,7 @@ class carImages():
     IMG_HEIGHT = 128
     IMG_WIDTH = 128
 
-    PARENT_FOLDER = "CameraViewDistanceDataSet"
+    PARENT_FOLDER = "CameraViewDistanceDataSet/TrainingDataSet"
 
     TOWN_FOLDERS = [    "Town03_A",
                         "Town03_B",
