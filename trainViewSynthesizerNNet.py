@@ -8,7 +8,7 @@
     It assumes a data set is available in the form of raw images and a text file for distances. 
     
     Two flags:
-        REBUILD_DATA -- prepares a tensor from the training data set (default False)
+        REBUILD_DATA -- prepares a NumPy tensor from the training data set (default False)
         TRAIN_NN -- trains the neural network and replaces existing trained one (default False)
 """
 
@@ -99,13 +99,16 @@ acarImages = carImages()
 if REBUILD_DATA:
     acarImages.make_training_data()
 
-training_data = []
-for townFolder in acarImages.TOWN_FOLDERS:
-    training_data_Town = np.load("training_data_tensor_" + townFolder + ".npy", allow_pickle=True)
-    if len(training_data) == 0:
-        training_data = training_data_Town
-        continue
-    training_data = np.concatenate((training_data, training_data_Town), axis=0)
+def getNumPyTrainingData():
+    """Returns the NumPy training data tensors"""
+    training_data = []
+    for townFolder in acarImages.TOWN_FOLDERS:
+        training_data_Town = np.load("training_data_tensor_" + townFolder + ".npy", allow_pickle=True)
+        if len(training_data) == 0:
+            training_data = training_data_Town
+            continue
+        training_data = np.concatenate((training_data, training_data_Town), axis=0)
+    return training_data
 
 
 ###### Build Neural Network #######
@@ -283,8 +286,10 @@ net.to(device)
 #quit()
 
 
-###### Train Neural Network #######
+###### Prepare Torch Tensors from NumPy Tensors #######
 import torch.optim as optim
+
+training_data =  getNumPyTrainingData()
 
 img_feed = torch.Tensor([i[0] for i in training_data])
 s = torch.Tensor([i[1] for i in training_data]).view(-1,1,1,1)
@@ -316,6 +321,9 @@ EPOCHS     = 10000
 loader = torch.utils.data.DataLoader(observed_dist_target, batch_size=BATCH_SIZE, shuffle=True, pin_memory = True, drop_last = True)
 
 def train(net):
+    """ 
+    Train Neural Network 
+    """
     optimizer = optim.Adam(net.parameters(), lr=0.001)
     #loss_function = nn.MSELoss(reduction = 'mean')
     #loss_function = nn.SmoothL1Loss(reduction = 'mean')
@@ -353,199 +361,3 @@ if TRAIN_NN:
 else:
     net.load_state_dict(torch.load('viewSynthesizerNNet.pth', map_location=device))
     net.eval()
-
-
-###### Test Training Result #######
-
-def test0():
-    # Shows the training data only, no generated views or use of the NN
-    #idx = random.randint(0, len(training_data))
-    print("Training Dataset Size:" + str(len(training_data)))
-    #print(train_s)
-    for idx in range(len(training_data)):
-        observed = training_data[idx][0]
-        desired_spacing = training_data[idx][1][0,0,0]
-        desired_view = training_data[idx][2]
-
-        plt.figure(1, figsize=(9,5))
-        plt.subplot(1,2,1)
-        plt.title("Observed View")
-        plt.imshow(observed.transpose(1,2,0), cmap="viridis")
-        plt.show(block = False)
-
-        plt.subplot(1,2,2)
-        plt.title("Ground Truth View for " +  '{:4.2f}'.format(desired_spacing))
-        plt.imshow(desired_view.transpose(1,2,0), cmap="viridis")
-        plt.show(block = False)
-        plt.pause(0.1)
-
-
-def test1(net):
-    # Generates a reference view: FIXED reference distance with FIXED camera view.
-    idx_ref = 80    # Picking a desired spacing 
-    idx = 747       # Picking an observation
-    print(len(train_img0))
-    print(len(training_data))
-    observed = train_img0[idx].to('cpu').numpy()
-    plt.figure(2, figsize=(9,5))
-    plt.subplot(1,3,1)
-    plt.axis("off")
-    plt.title("Observed View")
-    plt.imshow(observed.transpose(1,2,0)/255.0, cmap="viridis")
-
-    generated = net(train_img0[idx:idx+1].to(device), train_s[idx_ref:idx_ref+1].to(device))
-    generated = generated.to('cpu').detach().numpy()[0]
-    plt.subplot(1,3,2)
-    plt.axis("off")
-    plt.title("Generated View for " +  '{:4.2f}'.format(train_s[idx_ref:idx_ref+1].item()))
-    plt.imshow(generated.transpose(1,2,0)/255.0, cmap="viridis")
-
-    groundtruth = train_img[idx_ref].to('cpu').numpy()
-    plt.subplot(1,3,3)
-    plt.axis("off")
-    plt.title("Ground Truth View for " +  '{:4.2f}'.format(train_s[idx_ref:idx_ref+1].item()))
-    plt.imshow(groundtruth.transpose(1,2,0)/255.0, cmap="viridis")
-
-    plt.show(block = True)
-    
-    plt.figure(2,frameon=False)
-    plt.imshow(observed.transpose(1,2,0)/255.0, cmap="viridis")
-    plt.axis("off")
-    plt.savefig('observed.png',bbox_inches='tight', pad_inches=0)
-
-    plt.figure(2,frameon=False)
-    plt.imshow(generated.transpose(1,2,0)/255.0, cmap="viridis")
-    plt.axis("off")
-    plt.savefig('generated.png',bbox_inches='tight', pad_inches=0)
-
-
-def test2(net):
-    # Generates a reference view: FIXED camera view with VARYING reference distance
-    idx = 150       # Picking an observation
-    camera_feed_ = train_img0[idx].to('cpu').numpy()
-    plt.figure(3, figsize=(9,5))
-    plt.ion()
-    plt.subplot(1,2,1)
-    plt.title("Observed View")
-    plt.imshow(camera_feed_.transpose(1,2,0)/255.0, cmap="viridis")
-    #plt.show(block = False)
-    
-    camera_feed = train_img0[idx:idx+1].to(device)
-    plt.subplot(1,2,2)
-    for idx_ref in tqdm(range(5,40,1)):
-        img_hat = net(camera_feed, torch.Tensor([[[[idx_ref]]]]).to(device))
-        img_hat = img_hat.to('cpu').detach().numpy()[0]
-        plt.imshow(img_hat.transpose(1,2,0)/255.0, cmap="viridis")
-        plt.title("Generated View for " + '{:4.2f}'.format(idx_ref))
-        plt.pause(0.25)
-        #plt.draw()
-
-    input("Press [enter] to close.")
-
-def test3(net):
-    # Generates a reference view: FIXED reference distance with VARYING camera views
-    idx_ref = 10        # Picking a desired spacing 
-
-    fig = plt.figure(4, figsize=(9,5))
-    plt.ion()
-    sub1 = fig.add_subplot(1,2,1)
-    sub1.set_title("Observed View")    
-    sub2 = fig.add_subplot(1,2,2)
-    sub2.set_title("Generated View for " + '{:4.2f}'.format(idx_ref))
-
-    for idx in tqdm(range(0,len(train_img0),1)):
-        camera_feed_ = train_img0[idx].to('cpu').numpy()
-        camera_feed = train_img0[idx:idx+1].to(device)
-        img_hat = net(camera_feed, torch.Tensor([[[[idx_ref]]]]).to(device))
-        img_hat = img_hat.to('cpu').detach().numpy()[0]
-        sub1.imshow(camera_feed_.transpose(1,2,0)/255.0, cmap="viridis")
-        sub2.imshow(img_hat.transpose(1,2,0)/255.0, cmap="viridis")
-        plt.pause(0.25)
-        #plt.draw()
-
-    input("Press [enter] to close.")
-
-
-def testGeneralizationDataSet(net):
-    # Generates a reference view: FIXED reference distance with FIXED camera view.
-
-    IMG_HEIGHT = 128
-    IMG_WIDTH = 128
-
-    CAMERA_IMAGES_FOLDER_Web = "CameraViewDistanceDataSet/GeneralizationDataSet"
-    LABELS_Web = [f for f in os.listdir(CAMERA_IMAGES_FOLDER_Web) if not f.startswith('.')] # Use this to avoid hidden files
-    LABELS_Web.sort()
-
-    test_data = []
-    for label in tqdm(LABELS_Web):
-        try:
-            path = os.path.join(CAMERA_IMAGES_FOLDER_Web, label)
-            img = cv2.imread(path, cv2.IMREAD_COLOR)   # HxWxC
-            img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
-            img = img.transpose(2,0,1) # HxWxC ==> CxHxW
-            img = img[::-1,:,:]  # BGR ==> RGB
-            test_data.append(np.array(img))
-        except Exception as e:
-            print(e)
-            pass
-
-    img_web = torch.Tensor([i for i in test_data])
-
-    idx = 333
-    camera_feed_ = img_web[idx].to('cpu').numpy()
-    plt.figure(6, figsize=(9,5))
-    plt.ion()
-    plt.subplot(1,2,1)
-    plt.title("Observed Camera Feed")
-    plt.imshow(camera_feed_.transpose(1,2,0)/255.0, cmap="viridis")
-    
-    camera_feed = img_web[idx:idx+1].to(device)
-    plt.subplot(1,2,2)
-    for idx_ref in tqdm(range(10,21,10)):
-        img_hat = net(camera_feed, torch.Tensor([[[[idx_ref]]]]).to(device))
-        img_hat = img_hat.to('cpu').detach().numpy()[0]
-        plt.imshow(img_hat.transpose(1,2,0)/255.0, cmap="viridis")
-        plt.title("Generated Scene View for Spacing " + '{:4.2f}'.format(idx_ref))
-        plt.pause(0.25)
-
-    input("Press [enter] to close.")
-
-    plt.figure(6,frameon=False)
-    plt.imshow(camera_feed_.transpose(1,2,0)/255.0, cmap="viridis")
-    plt.axis("off")
-    plt.savefig('observed.png',bbox_inches='tight', pad_inches=0)
-
-    plt.figure(6,frameon=False)
-    plt.imshow(img_hat.transpose(1,2,0)/255.0, cmap="viridis")
-    plt.axis("off")
-    plt.savefig('generated.png',bbox_inches='tight', pad_inches=0)
-
-
-def testDiff(net,yref,y):
-    i2 = yref
-    i1 = y
-    plt.figure(4)
-    plt.show(block = False)
-    img1 = net(s_sorted_A[i1:(i1+1)].to(device))
-    img1 = img1.to('cpu')
-    img1 = img1.detach().numpy()[0]
-    img2 = net(s_sorted_A[i2:(i2+1)].to(device))
-    img2 = img2.to('cpu')
-    img2 = img2.detach().numpy()[0]
-    imgdiff = img2 - img1
-    print(imgdiff)
-    imgdiffabs = cv2.convertScaleAbs(imgdiff)
-    plt.imshow(imgdiffabs.transpose(1,2,0)/255.0, cmap="viridis")
-    plt.draw()
-    K = np.zeros((3,150,200))
-    K[:,:,75:125] = 1
-    u = np.sum(K*(imgdiff)/255.0)
-    return img1, img2, u
-
-
-
-#test0()
-#test1(net)
-#test2(net)
-#test3(net)
-#testGeneralizationDataSet(net)
