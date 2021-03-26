@@ -245,7 +245,7 @@ class CarFollowing:
         # using currently trained network, we generate a reference 
         # for as far as possible which is 30m. With that, it currently 
         # partially works if K = np.ones((3, 128, 128)) / 372.0, when
-        # desired spacing is 10.
+        # desired spacing is 10 and throttle of leader is 0.16.
         net = self.NN
 
         camera_feed = torch.Tensor([self.img]).to('cuda:0)')
