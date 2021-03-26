@@ -62,6 +62,7 @@ class CarFollowing:
         self.img = None
         self.PGain = None
         self.img_ref = None
+        self.img_ref0 = None
 
         try:
             net = trainViewSynthesizerNNet.Net()
@@ -212,6 +213,9 @@ class CarFollowing:
         return u
 
     def getErrorSignal_BlockDiagram1(self, yref):
+        """
+        Implements Block Diagram 1 in L4DC paper.
+        """
         #if self.img_ref is None:
         net = self.NN
         #print(self.img)
@@ -229,6 +233,34 @@ class CarFollowing:
         #print(self.img)
         img_err = (self.img_ref - self.img)/255.0
         #print(img_err)
+        return img_err
+
+    def getErrorSignal_BlockDiagram2(self, yref):
+        """
+        Implements Block Diagram 2 in L4DC paper.
+        """
+
+        # Note this implementation is not using yet a neural network
+        # to correctly keep the background only. To approximate this
+        # using currently trained network, we generate a reference 
+        # for as far as possible which is 30m. With that, it currently 
+        # partially works if K = np.ones((3, 128, 128)) / 372.0, when
+        # desired spacing is 10.
+        net = self.NN
+
+        camera_feed = torch.Tensor([self.img]).to('cuda:0)')
+        img_ref = net(camera_feed,torch.Tensor([[[[yref]]]]).to('cuda:0)'))
+        img_ref = img_ref.to('cpu')
+        self.img_ref = img_ref.detach().numpy()[0]
+
+        img_ref0 = net(camera_feed,torch.Tensor([[[[30]]]]).to('cuda:0)'))
+        img_ref0 = img_ref0.to('cpu')
+        self.img_ref0 = img_ref0.detach().numpy()[0]
+
+        img_err =   (  -np.absolute(self.img_ref0 - self.img_ref) 
+                       +np.absolute(self.img_ref0 - self.img)
+                    )/255.0
+        print(img_err)
         return img_err
 
 def main():
