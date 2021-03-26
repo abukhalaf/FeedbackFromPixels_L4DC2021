@@ -169,11 +169,14 @@ class CarFollowing:
 
     def PControl(self, img_err):
         if self.PGain is None:
-            K = np.ones((3, 128, 128))
+            K = np.ones((3, 128, 128)) / 50.0
             self.PGain = K
 
         K = self.PGain
-        u = -np.sum(K * (img_err) / 50.0)        
+        f = np.sum(K * img_err )
+        f_bar = 0 
+        f_tilda = f_bar - f
+        u = f_tilda        
         #print(u)
         #u = np.clip(u, -0.5, 0.5)
         #print(u)
@@ -208,7 +211,7 @@ class CarFollowing:
         self.distance = np.concatenate((self.distance, [self.row]), axis=0)        
         return u
 
-    def getErrorSignal(self, yref):
+    def getErrorSignal_BlockDiagram1(self, yref):
         #if self.img_ref is None:
         net = self.NN
         #print(self.img)
@@ -227,7 +230,6 @@ class CarFollowing:
         img_err = (self.img_ref - self.img)/255.0
         #print(img_err)
         return img_err
-
 
 def main():
     """
@@ -258,7 +260,7 @@ def main():
                 display.blit(envCar.surface, (0, 0))
             
             if envCar.img is not None:
-                img_err = envCar.getErrorSignal(10)
+                img_err = envCar.getErrorSignal_BlockDiagram1(10)
                 envCar.PControl(img_err)
             pygame.display.flip()
 
