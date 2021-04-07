@@ -1,5 +1,5 @@
-% Numerical solutions of the Static Output Feeedback Equations for the
-% Linearized system
+% Numerical Solutions of the Static Output Feeedback Equations for the
+% Linearized System
 
 % Author: Murad Abu-Khalaf, MIT CSAIL.
 
@@ -53,3 +53,4 @@ G3 = abs(c)*m2/alpha2
 % m1=1; m2=1; alpha1=1; alpha2=1; c =1;
 % G1=-1;G2=0;G3=1; 
 % %G1=1;G2=0;G3=-1; % a second valid solution for G
+

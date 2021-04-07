@@ -1,5 +1,5 @@
-% Symbolic solutions of the Static Output Feeedback Equations for the
-% Linearized system
+% Symbolic Solutions of the Static Output Feeedback Equations for the
+% Linearized System
 
 % Author: Murad Abu-Khalaf, MIT CSAIL.
 
@@ -60,3 +60,4 @@ G3 = abs(c)*m2/alpha2
 % Verify that the the equations are solved for this symbolic answer.
 simplify(subs(Ric))
 simplify(subs(Proj))
+
